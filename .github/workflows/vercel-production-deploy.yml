@@ -1,4 +1,4 @@
-﻿name: Build and Deploy
+﻿name: Vercel Production Deploy
 
 on:
   push:
@@ -8,9 +8,10 @@ on:
 
 permissions:
   contents: read
+  deployments: write
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,3 +25,19 @@ jobs:
         run: npm install
       - name: Build
         run: npm run build
+      - name: Deploy to Vercel Production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx -y vercel --prod --token $VERCEL_TOKEN --yes
+      - name: Assign custom alias
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          sleep 10
+          LATEST_ID=$(curl -s -H "Authorization: Bearer $VERCEL_TOKEN" "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_ORG_ID&limit=1" | grep -o '"uid":"[^"]*"' | head -1 | cut -d'"' -f4)
+          echo "Latest $LATEST_ID"
+          if [ -n "$LATEST_ID" ]; then curl -X POST "https://api.vercel.com/v2/deployments/$LATEST_ID/aliases?teamId=$VERCEL_ORG_ID" -H "Authorization: Bearer $VERCEL_TOKEN" -H "Content-Type: application/json" -d "{\"alias\":\"eshanya-site.vercel.app\"}" || true; fi
